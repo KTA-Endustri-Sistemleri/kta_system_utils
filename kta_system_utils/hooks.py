@@ -26,7 +26,9 @@ app_license = "mit"
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/kta_system_utils/css/kta_system_utils.css"
-# app_include_js = "/assets/kta_system_utils/js/kta_system_utils.js"
+app_include_js = [
+    "assets/kta_system_utils/js/cache_reload_handler.js",
+]
 
 # include js, css files in header of web template
 # web_include_css = "/assets/kta_system_utils/css/kta_system_utils.css"
@@ -148,23 +150,19 @@ app_license = "mit"
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"kta_system_utils.tasks.all"
-# 	],
-# 	"daily": [
-# 		"kta_system_utils.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"kta_system_utils.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"kta_system_utils.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"kta_system_utils.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+    "cron": {
+        # Her gece 01:00 — force logout + cache temizleme + browser hard-reload sinyali
+        "0 1 * * *": [
+            "kta_system_utils.kta_system_utils_maintenance.tasks.nightly_cache_clear"
+        ],
+    }
+}
+
+# Boot session: kullanıcı girişinde hard-reload flag'ini bootinfo'ya ekle
+extend_boot_session = (
+    "kta_system_utils.kta_system_utils_maintenance.boot.boot_session"
+)
 
 # Testing
 # -------

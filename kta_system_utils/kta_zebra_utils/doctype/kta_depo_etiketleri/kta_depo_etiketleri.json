@@ -1,0 +1,264 @@
+{
+ "actions": [],
+ "creation": "2025-01-20 07:56:55.151439",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_tzcg",
+  "print_label_to_zebra_kta",
+  "section_break_nhrt",
+  "gr_number",
+  "supplier_delivery_note",
+  "column_break_jdyk",
+  "gr_posting_date",
+  "do_not_split",
+  "section_break_auoj",
+  "item_name",
+  "custom_section_break_bx7af",
+  "item_group",
+  "batch",
+  "column_break_gyqj",
+  "item_code",
+  "section_break_aoac",
+  "qty",
+  "column_break_guft",
+  "uom",
+  "section_break_vyki",
+  "sut_barcode",
+  "column_break_oxmr",
+  "quality_ref",
+  "section_break_wbgs",
+  "table_gydm",
+  "column_break_amdo",
+  "print_split_labels_to_zebra_kta",
+  "section_break_iquo",
+  "column_break_kcus",
+  "custom_print_status"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_nhrt",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "label": "Qty",
+   "precision": "2"
+  },
+  {
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "label": "UoM",
+   "options": "UOM"
+  },
+  {
+   "fieldname": "column_break_jdyk",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sut_barcode",
+   "fieldtype": "Data",
+   "label": "SUT Barcode"
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "label": "Malzeme",
+   "options": "Item"
+  },
+  {
+   "fieldname": "gr_number",
+   "fieldtype": "Link",
+   "in_filter": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "GR NUMBER",
+   "options": "Purchase Receipt",
+   "search_index": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "gr_posting_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "GR DATE"
+  },
+  {
+   "fieldname": "supplier_delivery_note",
+   "fieldtype": "Data",
+   "label": "Tedarik\u00e7i \u0130rsaliyesi"
+  },
+  {
+   "fieldname": "batch",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Parti No",
+   "options": "Batch"
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Malzeme Ad\u0131"
+  },
+  {
+   "fieldname": "quality_ref",
+   "fieldtype": "Data",
+   "label": "Kontrol"
+  },
+  {
+   "fieldname": "item_group",
+   "fieldtype": "Data",
+   "label": "Malzeme Grubu"
+  },
+  {
+   "default": "0",
+   "fieldname": "do_not_split",
+   "fieldtype": "Check",
+   "label": "B\u00f6lme!"
+  },
+  {
+   "fieldname": "section_break_auoj",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_gyqj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_aoac",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_guft",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_vyki",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_oxmr",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_iquo",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_kcus",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "custom_print_status",
+   "fieldtype": "Data",
+   "label": "Print Status"
+  },
+  {
+   "fieldname": "custom_section_break_bx7af",
+   "fieldtype": "Section Break"
+  },
+  {
+   "depends_on": "do_not_split",
+   "fieldname": "section_break_wbgs",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "table_gydm",
+   "fieldtype": "Table",
+   "options": "KTA Depo Etiketleri Bolme"
+  },
+  {
+   "fieldname": "column_break_amdo",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "print_label_to_zebra_kta",
+   "fieldtype": "Button",
+   "label": "Etiketi bas"
+  },
+  {
+   "fieldname": "print_split_labels_to_zebra_kta",
+   "fieldtype": "Button",
+   "label": "Etiketi b\u00f6l"
+  },
+  {
+   "depends_on": "eval:doc.do_not_split==0;",
+   "fieldname": "section_break_tzcg",
+   "fieldtype": "Section Break"
+  }
+ ],
+ "grid_page_length": 50,
+ "links": [],
+ "modified": "2025-07-15 18:25:45.643149",
+ "modified_by": "Administrator",
+ "module": "Kta Zebra Utils",
+ "name": "KTA Depo Etiketleri",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Stock User",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Stock Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Quality Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "KTA Kalite Kullan\u0131c\u0131s\u0131",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1,
+ "track_seen": 1
+}

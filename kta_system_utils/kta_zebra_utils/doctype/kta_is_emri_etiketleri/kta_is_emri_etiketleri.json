@@ -1,0 +1,122 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-07-10 19:59:09.139248",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_13dh",
+  "print_date",
+  "material_number",
+  "material_description",
+  "work_order",
+  "gr_posting_date",
+  "gr_number",
+  "gr_source_warehouse",
+  "to_warehouse",
+  "stock_uom",
+  "batch_no",
+  "material_index",
+  "qty",
+  "sut_no"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_13dh",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "print_date",
+   "fieldtype": "Data",
+   "label": "print_date"
+  },
+  {
+   "fieldname": "material_number",
+   "fieldtype": "Data",
+   "label": "material_number"
+  },
+  {
+   "fieldname": "material_description",
+   "fieldtype": "Data",
+   "label": "material_description"
+  },
+  {
+   "fieldname": "work_order",
+   "fieldtype": "Data",
+   "label": "work_order"
+  },
+  {
+   "fieldname": "gr_posting_date",
+   "fieldtype": "Data",
+   "label": "gr_posting_date"
+  },
+  {
+   "fieldname": "gr_number",
+   "fieldtype": "Data",
+   "label": "gr_number"
+  },
+  {
+   "fieldname": "gr_source_warehouse",
+   "fieldtype": "Data",
+   "label": "gr_source_warehouse"
+  },
+  {
+   "fieldname": "to_warehouse",
+   "fieldtype": "Data",
+   "label": "to_warehouse"
+  },
+  {
+   "fieldname": "stock_uom",
+   "fieldtype": "Data",
+   "label": "stock_uom"
+  },
+  {
+   "fieldname": "batch_no",
+   "fieldtype": "Data",
+   "label": "batch_no"
+  },
+  {
+   "fieldname": "material_index",
+   "fieldtype": "Data",
+   "label": "material_index"
+  },
+  {
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "label": "qty",
+   "precision": "2"
+  },
+  {
+   "fieldname": "sut_no",
+   "fieldtype": "Data",
+   "label": "sut_no"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_virtual": 1,
+ "links": [],
+ "modified": "2025-07-10 20:13:12.811782",
+ "modified_by": "Administrator",
+ "module": "Kta Zebra Utils",
+ "name": "KTA Is Emri Etiketleri",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

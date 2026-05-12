@@ -46,6 +46,18 @@ class ZebraPrinter:
                 "message": f"Sorgu Hatası: {str(e)}"
             }
 
+    def send(self, data):
+        """ZPL verisini yazıcıya soket üzerinden gönderir."""
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(self.timeout)
+                s.connect((self.ip, self.port))
+                s.sendall(data.encode("utf-8"))
+                return None
+        except Exception as e:
+            frappe.log_error(title=f"ZPL Print Error {str(e)}", message="Printer Error")
+            return {"status": "error", "message": f"Failed to send label {str(e)}"}
+
     def _parse_hs_response(self, response):
         """
         ~HS yanıtını parse eder.
@@ -113,3 +125,40 @@ class ZebraPrinterManager:
             return {"status": "Error", "color": "gray", "message": "Yazıcı bulunamadı"}
         
         return printer.get_detailed_status()
+
+    @staticmethod
+    def get_printer_for_user(user=None):
+        """Kullanıcının varsayılan yazıcısını ZebraPrinter objesi olarak döndürür."""
+        if not user:
+            user = frappe.session.user
+
+        printer_name = frappe.db.get_value(
+            doctype="KTA User Zebra Printers",
+            filters={"user": user, "disabled": 0},
+            fieldname="printer"
+        )
+
+        if printer_name:
+            doc = frappe.get_doc("KTA Zebra Printers", printer_name)
+            return ZebraPrinter(doc.name, doc.ip, doc.port or 9100)
+        else:
+            frappe.msgprint("No default printer found for the current user.")
+            return None
+
+    @staticmethod
+    def format_data(doctype_name, data):
+        """KTA Zebra Templates üzerinden ZPL şablonuna veriyi basar."""
+        doc = frappe.get_doc("KTA Zebra Templates", doctype_name)
+        template = doc.get("zebra_template")
+        if not template:
+            frappe.throw(f"Zebra Template not found in KTA Zebra Templates for: {doctype_name}")
+        return template.format(data=data)
+
+    @staticmethod
+    def format_qty(qty):
+        """Sayıyı tr_TR lokaline uygun (küsüratsızsa tamsayı, değilse 2 hane) formatlar."""
+        from babel.numbers import format_decimal
+        if qty % 1 == 0:
+            return format_decimal(f"{qty:g}", locale="tr_TR")
+        else:
+            return format_decimal(f"{qty:.2f}", locale="tr_TR")

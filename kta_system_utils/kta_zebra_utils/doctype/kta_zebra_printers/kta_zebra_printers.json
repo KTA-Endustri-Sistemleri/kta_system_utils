@@ -1,0 +1,78 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:printer_name",
+ "creation": "2025-04-02 17:40:52.767354",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "printer_name",
+  "ip",
+  "port",
+  "section_break_mlgw",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_mlgw",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "KTA Zebra Printers",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "printer_name",
+   "fieldtype": "Data",
+   "label": "Printer Name",
+   "unique": 1
+  },
+  {
+   "fieldname": "ip",
+   "fieldtype": "Data",
+   "label": "IP"
+  },
+  {
+   "fieldname": "port",
+   "fieldtype": "Int",
+   "label": "Port"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2025-04-02 18:05:17.179049",
+ "modified_by": "Administrator",
+ "module": "Kta Zebra Utils",
+ "name": "KTA Zebra Printers",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "show_title_field_in_link": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "printer_name",
+ "track_changes": 1
+}

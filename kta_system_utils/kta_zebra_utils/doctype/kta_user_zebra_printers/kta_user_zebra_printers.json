@@ -41,7 +41,7 @@
  "links": [],
  "modified": "2025-04-02 18:50:54.525450",
  "modified_by": "Administrator",
- "module": "Kta Zebra Utils",
+ "module": "kta_zebra_utils",
  "name": "KTA User Zebra Printers",
  "naming_rule": "By fieldname",
  "owner": "Administrator",

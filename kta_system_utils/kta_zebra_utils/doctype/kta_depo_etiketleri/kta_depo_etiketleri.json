@@ -194,7 +194,7 @@
  "links": [],
  "modified": "2025-07-15 18:25:45.643149",
  "modified_by": "Administrator",
- "module": "Kta Zebra Utils",
+ "module": "kta_zebra_utils",
  "name": "KTA Depo Etiketleri",
  "owner": "Administrator",
  "permissions": [

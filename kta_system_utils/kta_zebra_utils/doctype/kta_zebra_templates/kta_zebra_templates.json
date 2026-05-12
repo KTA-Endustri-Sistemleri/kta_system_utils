@@ -34,7 +34,7 @@
  "links": [],
  "modified": "2025-06-11 22:50:59.232077",
  "modified_by": "Administrator",
- "module": "Kta Zebra Utils",
+ "module": "kta_zebra_utils",
  "name": "KTA Zebra Templates",
  "naming_rule": "By fieldname",
  "owner": "Administrator",

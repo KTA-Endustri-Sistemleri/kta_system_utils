@@ -28,7 +28,7 @@
  "links": [],
  "modified": "2025-07-08 14:30:44.481295",
  "modified_by": "Administrator",
- "module": "Kta Zebra Utils",
+ "module": "kta_zebra_utils",
  "name": "KTA Depo Etiketleri Bolme",
  "owner": "Administrator",
  "permissions": [],

@@ -46,17 +46,66 @@ class ZebraPrinter:
                 "message": f"Sorgu Hatası: {str(e)}"
             }
 
-    def send(self, data):
+    def _create_print_log(self, label_doctype, label_name, status, zpl, error=None):
+        if not label_doctype or not label_name:
+            return
+        try:
+            frappe.get_doc({
+                "doctype": "KTA Print Log",
+                "label_doctype": label_doctype,
+                "label_name": label_name,
+                "printer": self.printer_name,
+                "user": frappe.session.user if frappe.has_active_session() else "Administrator",
+                "status": status,
+                "attempted_at": frappe.utils.now(),
+                "error_message": error,
+                "zpl_payload": zpl[:500] if zpl else None
+            }).insert(ignore_permissions=True)
+            frappe.db.commit()
+        except Exception as e:
+            frappe.log_error(f"Print Log Creation Error: {str(e)}", "KTA Print Log")
+
+    def send(self, data, label_doctype=None, label_name=None):
         """ZPL verisini yazıcıya soket üzerinden gönderir."""
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.settimeout(self.timeout)
                 s.connect((self.ip, self.port))
                 s.sendall(data.encode("utf-8"))
-                return None
+            self._create_print_log(label_doctype, label_name, "Success", data)
+            return None
         except Exception as e:
+            self._create_print_log(label_doctype, label_name, "Failed", data, str(e))
             frappe.log_error(title=f"ZPL Print Error {str(e)}", message="Printer Error")
             return {"status": "error", "message": f"Failed to send label {str(e)}"}
+
+    def send_batch(self, data_list, label_doctype=None, label_names=None):
+        """
+        ZPL listesini tek TCP bağlantısında sırayla gönderir.
+        data_list: [zpl_str, ...]
+        label_names: [label_name, ...] (data_list ile aynı sırada olmalı)
+        """
+        errors = []
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(self.timeout)
+                s.connect((self.ip, self.port))
+                for i, zpl in enumerate(data_list):
+                    lbl = label_names[i] if label_names and i < len(label_names) else None
+                    try:
+                        s.sendall(zpl.encode("utf-8"))
+                        self._create_print_log(label_doctype, lbl, "Success", zpl)
+                    except Exception as e:
+                        errors.append({"label": lbl, "error": str(e)})
+                        self._create_print_log(label_doctype, lbl, "Failed", zpl, str(e))
+        except Exception as e:
+            frappe.log_error(f"Batch TCP Error: {e}", "ZebraPrinter")
+            # Eğer tüm batch için connection hatası aldıysak, henüz gönderilemeyenleri Failed logla
+            for i, zpl in enumerate(data_list):
+                lbl = label_names[i] if label_names and i < len(label_names) else None
+                self._create_print_log(label_doctype, lbl, "Failed", zpl, str(e))
+            errors.append({"error": str(e)})
+        return errors
 
     def _parse_hs_response(self, response):
         """

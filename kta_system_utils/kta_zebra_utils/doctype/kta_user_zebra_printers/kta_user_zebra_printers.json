@@ -8,6 +8,7 @@
  "field_order": [
   "user",
   "printer",
+  "fallback_printer",
   "disabled",
   "section_break_bajg"
  ],
@@ -27,6 +28,12 @@
    "fieldname": "printer",
    "fieldtype": "Link",
    "label": "Zebra Printer",
+   "options": "KTA Zebra Printers"
+  },
+  {
+   "fieldname": "fallback_printer",
+   "fieldtype": "Link",
+   "label": "Fallback Zebra Printer",
    "options": "KTA Zebra Printers"
   },
   {
@@ -57,6 +64,10 @@
    "role": "System Manager",
    "share": 1,
    "write": 1
+  },
+  {
+   "read": 1,
+   "role": "All"
   }
  ],
  "sort_field": "modified",

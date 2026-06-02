@@ -1,3 +1,6 @@
+let bulk_printer_statuses = {};
+let bulk_loading = false;
+
 frappe.ui.form.on('KTA Zebra Printers', {
     refresh: function(frm) {
         // Form görünümünde göstergeyi ekle
@@ -13,11 +16,26 @@ frappe.ui.form.on('KTA Zebra Printers', {
 // Liste görünümü için
 frappe.listview_settings['KTA Zebra Printers'] = {
     onload: function(listview) {
-        // Liste yüklendiğinde her satıra indicator eklemek için bir metod gerekebilir
-        // Ancak basitlik için liste görünümünde standart indicator alanlarını kullanmak daha iyidir
+        if (!bulk_loading) {
+            bulk_loading = true;
+            frappe.call({
+                method: 'kta_system_utils.kta_zebra_utils.api.get_all_printers_status',
+                callback: function(r) {
+                    bulk_loading = false;
+                    if (r.message) {
+                        bulk_printer_statuses = r.message;
+                        listview.refresh();
+                    }
+                }
+            });
+        }
     },
-    refresh: function(listview) {
-        // Liste yenilendiğinde durumları çekebiliriz
+    get_indicator: function(doc) {
+        let status = bulk_printer_statuses[doc.name];
+        if (status) {
+            return [__(status.message), status.color, "printer_name,=," + doc.name];
+        }
+        return [__("Sorgulanıyor..."), "gray", "printer_name,=," + doc.name];
     }
 };
 
@@ -39,8 +57,10 @@ function update_printer_status(frm) {
                     frm.dashboard.clear_headline();
                 }
                 
-                // Standart Frappe bildirim gösterimi (Sağ altta çıkan veya üstte)
-                // Kalıcı olması için set_intro kullanalım ama temizleyerek
+                // Form header indicator
+                frm.page.set_indicator(status.message, status.color);
+                
+                // Form intro banner
                 frm.set_intro(status.message, status.color);
             }
         }

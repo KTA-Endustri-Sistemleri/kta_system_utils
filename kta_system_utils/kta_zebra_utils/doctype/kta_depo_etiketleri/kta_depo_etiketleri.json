@@ -33,7 +33,12 @@
   "print_split_labels_to_zebra_kta",
   "section_break_iquo",
   "column_break_kcus",
-  "custom_print_status"
+  "custom_print_status",
+  "section_break_print_metrics",
+  "print_count",
+  "column_break_print_metrics",
+  "last_printed_at",
+  "last_printed_by"
  ],
  "fields": [
   {
@@ -188,6 +193,35 @@
    "depends_on": "eval:doc.do_not_split==0;",
    "fieldname": "section_break_tzcg",
    "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "section_break_print_metrics",
+   "fieldtype": "Section Break",
+   "label": "Print Metrics"
+  },
+  {
+   "default": "0",
+   "fieldname": "print_count",
+   "fieldtype": "Int",
+   "label": "Print Count",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_print_metrics",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "last_printed_at",
+   "fieldtype": "Datetime",
+   "label": "Last Printed At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_printed_by",
+   "fieldtype": "Link",
+   "label": "Last Printed By",
+   "options": "User",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,

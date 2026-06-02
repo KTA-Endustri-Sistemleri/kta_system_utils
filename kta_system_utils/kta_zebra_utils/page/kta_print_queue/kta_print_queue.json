@@ -1,0 +1,20 @@
+{
+ "content": "",
+ "creation": "2026-06-02 17:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2026-06-02 17:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "kta_zebra_utils",
+ "name": "kta_print_queue",
+ "owner": "Administrator",
+ "page_name": "kta_print_queue",
+ "roles": [
+  {
+   "role": "System Manager"
+  }
+ ],
+ "standard": "Yes",
+ "title": "KTA Print Queue"
+}

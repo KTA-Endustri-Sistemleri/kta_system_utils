@@ -47,23 +47,15 @@ class ZebraPrinter:
             }
 
     def _create_print_log(self, label_doctype, label_name, status, zpl, error=None):
-        if not label_doctype or not label_name:
-            return
-        try:
-            frappe.get_doc({
-                "doctype": "KTA Print Log",
-                "label_doctype": label_doctype,
-                "label_name": label_name,
-                "printer": self.printer_name,
-                "user": frappe.session.user if frappe.has_active_session() else "Administrator",
-                "status": status,
-                "attempted_at": frappe.utils.now(),
-                "error_message": error,
-                "zpl_payload": zpl[:500] if zpl else None
-            }).insert(ignore_permissions=True)
-            frappe.db.commit()
-        except Exception as e:
-            frappe.log_error(f"Print Log Creation Error: {str(e)}", "KTA Print Log")
+        ZebraPrinterManager.create_print_log(
+            label_doctype=label_doctype,
+            label_name=label_name,
+            printer=self.printer_name,
+            status=status,
+            zpl=zpl,
+            error=error,
+            user=getattr(frappe.session, "user", None) or "Administrator"
+        )
 
     def send(self, data, label_doctype=None, label_name=None):
         """ZPL verisini yazıcıya soket üzerinden gönderir."""
@@ -148,6 +140,34 @@ class ZebraPrinter:
         except Exception:
             return {"status": "Online", "color": "green", "message": "Çevrimiçi (Detay Alınamadı)"}
 
+class MockZebraPrinter(ZebraPrinter):
+    """
+    Test ve geliştirme ortamı için yazıcı simülasyonu.
+    Gerçek TCP bağlantısı açmaz; ZPL çıktısını log'a yazar.
+    """
+    def __init__(self):
+        super().__init__("MOCK_PRINTER", "127.0.0.1", 9100)
+
+    def check_connection(self):
+        return True
+
+    def get_detailed_status(self):
+        return {"status": "Ready", "color": "green", "message": "Yazıcı Hazır (MOCK)"}
+
+    def send(self, data, label_doctype=None, label_name=None):
+        self._create_print_log(label_doctype, label_name, "Success", data)
+        frappe.log_error(
+            title="[MOCK ZEBRA] ZPL Output",
+            message=data[:1000]
+        )
+        return None
+
+    def send_batch(self, data_list, label_doctype=None, label_names=None):
+        for i, zpl in enumerate(data_list):
+            lbl = label_names[i] if label_names and i < len(label_names) else None
+            self.send(zpl, label_doctype=label_doctype, label_name=lbl)
+        return []
+
 class ZebraPrinterManager:
     """
     Yazıcı listesini yöneten ve toplu işlemler yapan Entity.
@@ -157,7 +177,7 @@ class ZebraPrinterManager:
 
     def get_printer_instance(self, printer_name):
         """Veritabanından yazıcı bilgilerini çekip nesne oluşturur."""
-        doc = frappe.get_doc("KTA Zebra Printers", printer_name)
+        doc = frappe.get_doc("KTA Zebra Printers", printer_name, ignore_permissions=True)
         if not doc:
             return None
         
@@ -176,32 +196,111 @@ class ZebraPrinterManager:
         return printer.get_detailed_status()
 
     @staticmethod
+    def _user_can_print(user, printer_name):
+        """Kullanıcının bu yazıcıya iş gönderme izni var mı?"""
+        user_roles = frappe.get_roles(user)
+        allowed_roles = frappe.get_all(
+            "KTA Printer Permission",
+            filters={"printer": printer_name, "can_print": 1},
+            pluck="role"
+        )
+        if not allowed_roles:
+            return True  # İzin tablosu boşsa herkese açık
+        return bool(set(user_roles) & set(allowed_roles))
+
+    @staticmethod
     def get_printer_for_user(user=None):
-        """Kullanıcının varsayılan yazıcısını ZebraPrinter objesi olarak döndürür."""
+        """Kullanıcının varsayılan veya fallback yazıcısını döndürür."""
+        if frappe.conf.get("use_mock_zebra_printer") or frappe.flags.in_test:
+            return MockZebraPrinter()
+
         if not user:
             user = frappe.session.user
 
-        printer_name = frappe.db.get_value(
+        user_printer = frappe.db.get_value(
             doctype="KTA User Zebra Printers",
             filters={"user": user, "disabled": 0},
-            fieldname="printer"
+            fieldname=["printer", "fallback_printer"],
+            as_dict=True
         )
 
-        if printer_name:
-            doc = frappe.get_doc("KTA Zebra Printers", printer_name)
-            return ZebraPrinter(doc.name, doc.ip, doc.port or 9100)
-        else:
+        if not user_printer:
             frappe.msgprint("No default printer found for the current user.")
             return None
 
+        # Primary printer'ı dene
+        primary_printer = None
+        if user_printer.printer:
+            if ZebraPrinterManager._user_can_print(user, user_printer.printer):
+                doc = frappe.get_doc("KTA Zebra Printers", user_printer.printer, ignore_permissions=True)
+                primary_printer = ZebraPrinter(doc.name, doc.ip, doc.port or 9100)
+            else:
+                frappe.msgprint(f"Varsayılan yazıcıya ({user_printer.printer}) erişim izniniz yok.", alert=True)
+
+        if primary_printer:
+            # Sadece bağlantı kontrolü yapıyoruz. Eğer ayakta ise döndür
+            if primary_printer.check_connection():
+                return primary_printer
+            
+            # Bağlanamıyorsak ve fallback varsa onu dene
+            if user_printer.fallback_printer:
+                if ZebraPrinterManager._user_can_print(user, user_printer.fallback_printer):
+                    fallback_doc = frappe.get_doc("KTA Zebra Printers", user_printer.fallback_printer, ignore_permissions=True)
+                    fallback_printer = ZebraPrinter(fallback_doc.name, fallback_doc.ip, fallback_doc.port or 9100)
+                    frappe.msgprint(f"Varsayılan yazıcıya ({primary_printer.printer_name}) erişilemedi, yedek yazıcı ({fallback_printer.printer_name}) kullanılıyor.", alert=True)
+                    return fallback_printer
+                else:
+                    frappe.msgprint(f"Yedek yazıcıya ({user_printer.fallback_printer}) erişim izniniz yok.", alert=True)
+            else:
+                # Fallback yoksa yine de primary'i dönelim (çünkü hata logu oluşturulurken hangi yazıcıya gitmeye çalıştığı loglanmalı)
+                # Ancak kullanıcıya uyarı göster
+                frappe.msgprint(f"Varsayılan yazıcıya ({primary_printer.printer_name}) erişilemiyor ve yedek yazıcı tanımlanmamış.", alert=True)
+                return primary_printer
+        elif user_printer.fallback_printer:
+            # Primary printer'a izin yoksa direkt fallback'e bakabiliriz!
+            if ZebraPrinterManager._user_can_print(user, user_printer.fallback_printer):
+                fallback_doc = frappe.get_doc("KTA Zebra Printers", user_printer.fallback_printer, ignore_permissions=True)
+                fallback_printer = ZebraPrinter(fallback_doc.name, fallback_doc.ip, fallback_doc.port or 9100)
+                frappe.msgprint(f"Varsayılan yazıcıya izniniz yok, yedek yazıcı ({fallback_printer.printer_name}) kullanılıyor.", alert=True)
+                return fallback_printer
+
+        return None
+
     @staticmethod
     def format_data(doctype_name, data):
-        """KTA Zebra Templates üzerinden ZPL şablonuna veriyi basar."""
-        doc = frappe.get_doc("KTA Zebra Templates", doctype_name)
-        template = doc.get("zebra_template")
+        """KTA Zebra Templates üzerinden ZPL şablonuna veriyi basar. Şablon cache'lenir."""
+        cache_key = f"kta_zebra_template_{doctype_name}"
+        template = frappe.cache().get_value(cache_key)
+
         if not template:
-            frappe.throw(f"Zebra Template not found in KTA Zebra Templates for: {doctype_name}")
+            doc = frappe.get_doc("KTA Zebra Templates", doctype_name, ignore_permissions=True)
+            template = doc.get("zebra_template")
+            if not template:
+                frappe.throw(f"Zebra Template not found in KTA Zebra Templates for: {doctype_name}")
+            # 1 saatlik cache
+            frappe.cache().set_value(cache_key, template, expires_in_sec=3600)
+
         return template.format(data=data)
+
+    @staticmethod
+    def create_print_log(label_doctype, label_name, printer, status, zpl, error=None, user=None):
+        if not label_doctype or not label_name:
+            return
+        try:
+            frappe.get_doc({
+                "doctype": "KTA Print Log",
+                "label_doctype": label_doctype,
+                "label_name": label_name,
+                "printer": printer or None,
+                "user": user or frappe.session.user or "Administrator",
+                "status": status,
+                "attempted_at": frappe.utils.now(),
+                "error_message": error,
+                "zpl_payload": zpl[:500] if zpl else None
+            }).insert(ignore_permissions=True)
+            frappe.db.commit()
+        except Exception as e:
+            frappe.log_error(f"Print Log Creation Error: {str(e)}", "KTA Print Log")
 
     @staticmethod
     def format_qty(qty):

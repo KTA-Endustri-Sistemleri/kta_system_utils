@@ -159,7 +159,7 @@ class TestKTADepoEtiketleri(FrappeTestCase):
 	def test_queue_status_apis(self):
 		# Import page APIs
 		from kta_system_utils.kta_zebra_utils.page.kta_print_queue.kta_print_queue import (
-			get_queue_status, retry_job, cancel_job, retry_all_failed
+			get_queue_status, retry_job, cancel_job
 		)
 
 		# Create a pending log and a failed log

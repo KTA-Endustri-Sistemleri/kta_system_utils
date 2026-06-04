@@ -11,19 +11,19 @@ frappe.pages['kta_print_queue'].on_page_load = function(wrapper) {
 			padding: 15px;
 		}
 		.queue-card {
-			background: #fff;
-			border: 1px solid #f0f0f0;
+			background: var(--card-bg);
+			border: 1px solid var(--border-color);
 			border-radius: 8px;
 			padding: 20px;
 			margin-bottom: 25px;
-			box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+			box-shadow: var(--card-shadow);
 		}
 		.queue-title {
 			font-size: 1.2rem;
 			font-weight: 600;
 			margin-bottom: 15px;
-			color: #333;
-			border-bottom: 2px solid #f7f7f7;
+			color: var(--text-color);
+			border-bottom: 2px solid var(--border-color);
 			padding-bottom: 10px;
 			display: flex;
 			justify-content: space-between;
@@ -31,8 +31,12 @@ frappe.pages['kta_print_queue'].on_page_load = function(wrapper) {
 		}
 		.queue-table th {
 			font-weight: 500;
-			color: #666;
-			background-color: #fafafa !important;
+			color: var(--text-muted);
+			background-color: var(--bg-light-gray) !important;
+			border-bottom: 1px solid var(--border-color) !important;
+		}
+		.queue-table td {
+			border-color: var(--border-color) !important;
 		}
 		.status-badge {
 			padding: 4px 8px;
@@ -41,12 +45,12 @@ frappe.pages['kta_print_queue'].on_page_load = function(wrapper) {
 			font-weight: 500;
 		}
 		.status-pending {
-			background-color: #fff8e1;
-			color: #b78103;
+			background-color: var(--alert-bg-warning);
+			color: var(--alert-text-warning);
 		}
 		.status-failed {
-			background-color: #ffebee;
-			color: #c62828;
+			background-color: var(--alert-bg-danger);
+			color: var(--alert-text-danger);
 		}
 	</style>`).appendTo(wrapper);
 
@@ -54,24 +58,9 @@ frappe.pages['kta_print_queue'].on_page_load = function(wrapper) {
 	let container = $('<div class="print-queue-container"></div>').appendTo(page.body);
 
 	// Yenile butonu
-	page.add_inner_button(__('Yenile'), () => refresh_queue(), 'fa fa-refresh');
+	page.add_action_icon('es-line-reload', () => refresh_queue(), '', __('Yenile'));
 
-	// Toplu Yeniden Dene butonu
-	let btn_retry_all = page.add_custom_button(__('Başarısızları Yeniden Dene'), () => {
-		frappe.confirm(__('Son 2 saatteki tüm başarısız etiket basımlarını yeniden denemek istediğinize emin misiniz?'), () => {
-			frappe.call({
-				method: 'kta_system_utils.kta_zebra_utils.page.kta_print_queue.kta_print_queue.retry_all_failed',
-				freeze: true,
-				callback: function(r) {
-					if (r.message && r.message.status === 'success') {
-						frappe.show_alert({message: r.message.message, indicator: 'green'});
-						refresh_queue();
-					}
-				}
-			});
-		});
-	});
-	btn_retry_all.addClass('btn-primary');
+
 
 	// Kuyruk Durumunu getirme ve listeleme fonksiyonu
 	function refresh_queue() {

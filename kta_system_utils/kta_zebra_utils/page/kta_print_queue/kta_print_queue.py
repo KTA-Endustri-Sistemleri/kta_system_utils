@@ -47,9 +47,3 @@ def cancel_job(log_name):
         return {"status": "success", "message": "İş iptal edildi."}
     return {"status": "error", "message": "Sadece bekleyen işler iptal edilebilir."}
 
-@frappe.whitelist()
-def retry_all_failed():
-    """Son 2 saatteki tüm başarısız işleri yeniden dener."""
-    from erpnextkta.kta_stock.tasks import retry_failed_print_jobs
-    retry_failed_print_jobs()
-    return {"status": "success", "message": "Tüm başarısız işler yeniden başlatıldı."}

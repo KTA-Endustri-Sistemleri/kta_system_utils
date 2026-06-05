@@ -139,6 +139,8 @@ Farklı etiket türleri için ZPL (Zebra Programming Language) şablonlarını s
 
 Şablon, `ZebraPrinterManager.format_data(doctype_name, data)` ile işlenir; `data` nesnesi bir Python sözlüğü/nesnesidir.
 
+> **Cache Otomatik Geçersizleştirme:** `KTA Zebra Templates` kaydı kaydedildiğinde (`on_update` hook) ilgili cache anahtarı otomatik olarak silinir. Manuel cache temizlemeye gerek yoktur.
+
 ---
 
 #### 5. `KTA Print Log` — Yazdırma Geçmişi
@@ -151,10 +153,19 @@ Her yazdırma girişiminin (başarılı veya başarısız) otomatik denetim kayd
 | `label_name`    | DynLink   | Belgenin `name` değeri                          |
 | `printer`       | Link      | Hangi yazıcıya gönderildi                       |
 | `user`          | Link      | İsteği başlatan kullanıcı                       |
-| `status`        | Select    | `Pending` / `Success` / `Failed`                |
+| `status`        | Select    | `Pending` / `Success` / `Failed` / `Retried`    |
 | `attempted_at`  | Datetime  | Deneme zamanı                                   |
 | `error_message` | Small Text| Hata varsa detayı                               |
 | `zpl_payload`   | Text      | Gönderilen ZPL'nin ilk 500 karakteri            |
+
+**Durum Anlamları:**
+
+| Durum     | Açıklama |
+|-----------|----------|
+| `Pending` | Kuyrukta bekliyor, worker henüz işlemedi |
+| `Success` | Yazıcıya başarıyla gönderildi |
+| `Failed`  | Gönderim başarısız (hata detayı `error_message` alanında) |
+| `Retried` | Print Queue sayfasından manuel yeniden deneme yapıldı; yeni bir `Success`/`Failed` logu üretilir |
 
 ---
 
@@ -207,8 +218,10 @@ ZebraPrinterManager.format_data(doctype, data)
       │
       ▼
 ZebraPrinter.send(zpl) veya send_batch([zpl, ...])
-      └─► TCP soket açılır → ZPL string yazıcıya gönderilir → soket kapatılır
-      └─► KTA Print Log kaydı oluşturulur (Success veya Failed)
+      ├─► send()       → Tek ZPL, tek TCP bağlantısı
+      └─► send_batch() → Liste, BATCH_CHUNK_SIZE (10) adetlik gruplara bölünür
+              └─► Her grup için _send_single_chunk() — ayrı TCP bağlantısı
+              └─► Her etiket için KTA Print Log kaydı (Success veya Failed)
 ```
 
 #### B. Yedek Yazıcı (Fallback) Karar Ağacı
@@ -294,6 +307,24 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
 
 ---
 
+### Toplu Gönderim: `send_batch` ve Chunk Mimarisi
+
+Çok sayıda etiketin tek seferde basılması gerektiğinde `ZebraPrinter.send_batch()` kullanılır. Zebra yazıcıların TCP alım tamponu (~32 KB) sınırlı olduğundan büyük listelerde sessiz veri kaybı yaşanabilir. Bu riski önlemek için gönderim `BATCH_CHUNK_SIZE = 10` adetlik parçalara bölünür:
+
+```
+send_batch([zpl_1, zpl_2, ..., zpl_35])
+      │
+      ├─► Chunk 1: [zpl_1  … zpl_10]  → _send_single_chunk() → TCP bağlantısı 1
+      ├─► Chunk 2: [zpl_11 … zpl_20]  → _send_single_chunk() → TCP bağlantısı 2
+      ├─► Chunk 3: [zpl_21 … zpl_30]  → _send_single_chunk() → TCP bağlantısı 3
+      └─► Chunk 4: [zpl_31 … zpl_35]  → _send_single_chunk() → TCP bağlantısı 4
+```
+
+- Bir chunk'ta bağlantı hatası oluşursa **yalnızca o chunk** Failed loglanır; diğer chunk'lar etkilenmez.
+- `BATCH_CHUNK_SIZE` sınıf seviyesinde sabittir; ihtiyaca göre değiştirilebilir.
+
+---
+
 ### Frontend: Gerçek Zamanlı Durum Göstergesi
 
 `kta_zebra_indicator.js` dosyası iki farklı davranış içerir:
@@ -328,6 +359,49 @@ fetch_and_update() çalışır
 #### Form Görünümü (`frappe.ui.form.on`)
 
 Form açıldığında ve "Durumu Güncelle" butonuna basıldığında `get_printer_status()` API'si çağrılır; sonuç form başlığında gösterge (indicator) ve intro banner olarak gösterilir.
+
+---
+
+### KTA Print Queue Sayfası
+
+`/app/kta-print-queue` adresinden erişilen bu Frappe Page, yazıcı sisteminin merkezi izleme ve müdahale ekranıdır.
+
+#### Sayfa Bölümleri
+
+**1. İstatistik Kartları (üst şerit)**
+
+`get_queue_stats()` API'si ile her 60 saniyede bir yenilenir:
+
+| Kart | Açıklama |
+|------|----------|
+| Bugün Başarılı | Günlük `Success` log sayısı |
+| Bugün Başarısız | Günlük `Failed` log sayısı |
+| Bekleyen | Günlük `Pending` log sayısı |
+| Yeniden Denenen | Günlük `Retried` log sayısı |
+
+**2. Yazıcı Durum Şeridi**
+
+Paralel `~HS` sorgusu ile tüm yazıcıların anlık durumu renk kodlu badge olarak gösterilir. 60 saniyede bir otomatik güncellenir.
+
+**3. Bekleyen İşler Tablosu**
+
+`status = Pending` kayıtları listelenir. Her satırda **İptal Et** butonu bulunur; butona basıldığında log `Failed` durumuna geçer.
+
+**4. Son Başarısız İşler Tablosu**
+
+`status = Failed` veya `Retried` kayıtları listelenir. Her satırda **Yeniden Dene** butonu bulunur:
+- `KTA Depo Etiketleri` tipi → `reprint_depo_label()` kuyruğa alınır
+- `Stock Entry` tipi → `print_kta_wo_labels_of_stock_entry()` kuyruğa alınır
+- Eski log `Retried` durumuna geçer; başarı/hata yeni bir log kaydıyla izlenir
+
+#### Yenileme Döngüleri
+
+| Bileşen | Interval | Yöntem |
+|---------|----------|--------|
+| Bekleyen/Başarısız tablolar | 15 saniye | `setInterval` |
+| İstatistik kartları + yazıcı durumu | 60 saniye | `setInterval` |
+
+Sayfa görünümden ayrıldığında (`destroyed`) her iki interval da temizlenir.
 
 ---
 
@@ -367,9 +441,10 @@ Otomatik testler (`frappe.flags.in_test`) sırasında da mock mod otomatik olara
 | Sınırlama | Açıklama |
 |-----------|----------|
 | Fallback yalnızca ağ tabanlı | Kağıt bittiğinde ağ bağlantısı devam ettiğinden fallback tetiklenmez |
-| ZPL şablon cache | Şablonda değişiklik yapıldıktan sonra Redis cache'i temizlemek gerekir: `bench --site <site> clear-cache` |
+| ZPL şablon cache | Şablon kaydedildiğinde cache **otomatik** temizlenir (`on_update` hook). Manuel müdahale gerekmez. |
 | Port 9100 varsayılanı | Zebra endüstri standardıdır; farklı bir port kullanılıyorsa her yazıcı kaydında açıkça belirtilmelidir |
 | Timeout 3 saniye | `ZebraPrinter.__init__` içinde `self.timeout = 3` sabit kodludur; çok sayıda çevrimdışı yazıcı olduğunda bu süre durum sorgulamasını yavaşlatabilir |
+| Batch chunk boyutu | `BATCH_CHUNK_SIZE = 10` sınıf sabitidir. Yazıcı modeline göre optimal değer değişebilir; gerekirse kod içinde ayarlanabilir |
 
 ---
 

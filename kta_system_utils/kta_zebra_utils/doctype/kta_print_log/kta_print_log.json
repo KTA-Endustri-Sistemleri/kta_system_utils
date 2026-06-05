@@ -43,7 +43,7 @@
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "Pending\nSuccess\nFailed"
+   "options": "Pending\nSuccess\nFailed\nRetried"
   },
   {
    "fieldname": "attempted_at",

@@ -71,12 +71,37 @@ class ZebraPrinter:
             frappe.log_error(title=f"ZPL Print Error {str(e)}", message="Printer Error")
             return {"status": "error", "message": f"Failed to send label {str(e)}"}
 
+    # Tek bir TCP bağlantısında gönderilecek maksimum ZPL sayısı.
+    # Zebra yazıcılar ~32 KB buffer'a sahiptir; büyük batch'lerde overflow riskini önler.
+    BATCH_CHUNK_SIZE = 10
+
     def send_batch(self, data_list, label_doctype=None, label_names=None):
         """
-        ZPL listesini tek TCP bağlantısında sırayla gönderir.
-        data_list: [zpl_str, ...]
+        ZPL listesini BATCH_CHUNK_SIZE'lık parçalara bölerek gönderir.
+        Her chunk için ayrı bir TCP bağlantısı açılır; yazıcı buffer'ı taşması önlenir.
+
+        data_list:   [zpl_str, ...]
         label_names: [label_name, ...] (data_list ile aynı sırada olmalı)
         """
+        if not data_list:
+            return []
+
+        all_errors = []
+        chunks = [
+            data_list[i:i + self.BATCH_CHUNK_SIZE]
+            for i in range(0, len(data_list), self.BATCH_CHUNK_SIZE)
+        ]
+
+        for chunk_idx, chunk in enumerate(chunks):
+            start = chunk_idx * self.BATCH_CHUNK_SIZE
+            chunk_names = label_names[start:start + len(chunk)] if label_names else None
+            errors = self._send_single_chunk(chunk, label_doctype, chunk_names)
+            all_errors.extend(errors)
+
+        return all_errors
+
+    def _send_single_chunk(self, data_list, label_doctype, label_names):
+        """Tek bir chunk'ı tek TCP bağlantısında sırayla gönderir."""
         errors = []
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -91,13 +116,14 @@ class ZebraPrinter:
                         errors.append({"label": lbl, "error": str(e)})
                         self._create_print_log(label_doctype, lbl, "Failed", zpl, str(e))
         except Exception as e:
-            frappe.log_error(f"Batch TCP Error: {e}", "ZebraPrinter")
-            # Eğer tüm batch için connection hatası aldıysak, henüz gönderilemeyenleri Failed logla
+            frappe.log_error(f"Batch TCP Error (chunk): {e}", "ZebraPrinter")
+            # Bağlantı kurulamadıysa tüm chunk'taki etiketleri Failed logla
             for i, zpl in enumerate(data_list):
                 lbl = label_names[i] if label_names and i < len(label_names) else None
                 self._create_print_log(label_doctype, lbl, "Failed", zpl, str(e))
             errors.append({"error": str(e)})
         return errors
+
 
     def _parse_hs_response(self, response):
         """

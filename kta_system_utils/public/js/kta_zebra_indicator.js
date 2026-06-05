@@ -13,28 +13,63 @@ frappe.ui.form.on('KTA Zebra Printers', {
     }
 });
 
+let printer_status_timer;
+
 // Liste görünümü için
 frappe.listview_settings['KTA Zebra Printers'] = {
-    onload: function(listview) {
-        if (!bulk_loading) {
-            bulk_loading = true;
+    refresh: function(listview) {
+        // Kullanıcı sayfaya her geri döndüğünde veya sayfayı yenilediğinde eski döngüyü temizle
+        if (printer_status_timer) {
+            clearTimeout(printer_status_timer);
+        }
+        
+        let fetch_and_update = function() {
+            // Eğer kullanıcı listeyi terk ettiyse döngüyü durdur
+            let route = frappe.get_route();
+            if (!route || route[0] !== 'List' || route[1] !== 'KTA Zebra Printers') {
+                return;
+            }
+
             frappe.call({
                 method: 'kta_system_utils.kta_zebra_utils.api.get_all_printers_status',
                 callback: function(r) {
-                    bulk_loading = false;
-                    if (r.message) {
-                        bulk_printer_statuses = r.message;
-                        listview.refresh();
+                    // API yanıt verene kadar kullanıcı sayfadan çıkmış olabilir, tekrar kontrol et
+                    route = frappe.get_route();
+                    if (!route || route[0] !== 'List' || route[1] !== 'KTA Zebra Printers') {
+                        return;
                     }
+
+                    if (r.message) {
+                        let statuses = r.message;
+                        // DOM üzerinde satırları bulup doğrudan güncelle
+                        $('.list-row-container').each(function() {
+                            let raw_name = $(this).find('.list-row-checkbox').attr('data-name');
+                            if (!raw_name) return;
+                            
+                            // Checkbox'taki isim encode (URL-encoded) edilmiş olabilir
+                            let docname = decodeURIComponent(raw_name);
+                            
+                            if (docname && statuses[docname]) {
+                                let status = statuses[docname];
+                                let $ind = $(this).find('.indicator-pill');
+                                if ($ind.length) {
+                                    $ind.removeClass().addClass('indicator-pill whitespace-nowrap ' + status.color);
+                                    $ind.html(`<span>${__(status.message)}</span>`);
+                                }
+                            }
+                        });
+                    }
+                    
+                    // İstek tamamen bittikten SONRA 5 saniye bekle ve tekrarla
+                    printer_status_timer = setTimeout(fetch_and_update, 5000);
                 }
             });
-        }
+        };
+
+        // Liste her ekrana geldiğinde (refresh) döngüyü yeniden başlat
+        fetch_and_update();
     },
     get_indicator: function(doc) {
-        let status = bulk_printer_statuses[doc.name];
-        if (status) {
-            return [__(status.message), status.color, "printer_name,=," + doc.name];
-        }
         return [__("Sorgulanıyor..."), "gray", "printer_name,=," + doc.name];
     }
 };

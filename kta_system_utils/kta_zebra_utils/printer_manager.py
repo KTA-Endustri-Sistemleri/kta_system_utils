@@ -115,16 +115,18 @@ class ZebraPrinter:
                 # Bazı durumlarda yanıt farklı formatta gelebilir
                 return {"status": "Online", "color": "green", "message": "Çevrimiçi (Hazır)"}
 
-            # String 2'yi analiz et
+            # String 1'i analiz et (Kağıt ve Duraklatma)
+            s1_parts = lines[0].split(',')
+            # String 2'yi analiz et (Kapak ve Ribon)
             s2_parts = lines[1].split(',')
             
-            if len(s2_parts) < 8:
+            if len(s1_parts) < 3 or len(s2_parts) < 4:
                 return {"status": "Online", "color": "green", "message": "Çevrimiçi"}
 
-            media_out = s2_parts[4].strip() == "1"
-            ribbon_out = s2_parts[5].strip() == "1"
-            head_open = s2_parts[6].strip() == "1"
-            is_paused = s2_parts[7].strip() == "1"
+            media_out = s1_parts[1].strip() == "1"
+            is_paused = s1_parts[2].strip() == "1"
+            head_open = s2_parts[2].strip() == "1"
+            ribbon_out = s2_parts[3].strip() == "1"
 
             if head_open:
                 return {"status": "Head Open", "color": "orange", "message": "Kapak Açık"}

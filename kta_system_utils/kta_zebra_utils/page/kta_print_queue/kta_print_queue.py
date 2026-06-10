@@ -1,6 +1,4 @@
 import frappe
-from erpnextkta.kta_stock.label_manager import reprint_depo_label
-
 
 @frappe.whitelist()
 def get_queue_status():
@@ -81,16 +79,13 @@ def retry_job(log_name):
     if log.status not in ("Failed", "Retried"):
         return {"status": "error", "message": "Sadece başarısız veya yeniden denenen işler tekrarlanabilir."}
 
-    if log.label_doctype == "KTA Depo Etiketleri":
-        reprint_depo_label(log.label_name)
-    elif log.label_doctype == "Stock Entry":
-        # WO (İş Emri) etiket yeniden basımı
+    if log.label_doctype == "KTA Stock Label":
         try:
-            from erpnextkta.kta_stock.label_manager import print_kta_wo_labels_of_stock_entry
-            print_kta_wo_labels_of_stock_entry(log.label_name)
+            fn = frappe.get_attr("erpnextkta.kta_stock.label_manager.reprint_depo_label")
+            fn(log.label_name)
         except Exception as e:
-            frappe.log_error(f"WO label retry error: {e}", "KTA Print Queue")
-            return {"status": "error", "message": f"WO etiket basımı başlatılamadı: {e}"}
+            frappe.log_error(f"KTA Stock Label retry error: {e}", "KTA Print Queue")
+            return {"status": "error", "message": f"Etiket basımı başlatılamadı: {e}"}
     else:
         return {"status": "error", "message": f"Bilinmeyen etiket tipi: {log.label_doctype}"}
 

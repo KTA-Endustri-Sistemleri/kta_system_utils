@@ -293,6 +293,28 @@ Frappe → TCP Soket aç → "~HS" gönder → Yanıtı oku → Soket kapat
 
 ---
 
+#### D. Uygulama ve Entegrasyon Sınırları (`kta_system_utils` vs `erpnextkta`)
+
+**ÖNEMLİ MİMARİ NOT:** `kta_system_utils` uygulaması; Purchase Receipt (Satınalma Kabul), Stock Entry (Repack/Üretim) gibi ERPNext modüllerinin iş kurallarından tamamen bağımsızdır. `kta_system_utils` sadece bir **donanım sürücüsü, yazdırma kuyruğu ve ZPL derleyicisi** olarak görev yapar.
+
+Akıllı etiketleme ve parti bölme (Batch Split) kurgularının sistemdeki yerleşimi şu şekildedir:
+
+1. **`kta_system_utils` (Bu Uygulama) Neler Yapar?**
+   - TCP Soket yönetimi ve yazıcı durumlarının (Hazır, Kapak Açık) izlenmesi.
+   - `ZebraPrinterManager` sınıfı üzerinden gelen rastgele JSON/Dict verilerini ZPL şablonlarıyla harmanlayıp yazıcıya yollamak.
+   - Print Log ve yetkilendirme (Rol/Kullanıcı) denetimlerini sağlamak.
+   - Herhangi bir ERPNext belgesi (Invoice, Delivery Note vb.) bu modülü çağırarak kendi özel etiketini bastırabilir.
+
+2. **`erpnextkta` / `kta_stock` Modülü Neler Yapar? (İş Kuralları)**
+   - **`KTA Stock Label`** (`KTA Depo Etiketleri`) DocType'ını barındırır.
+   - **Batch Split (Akıllı Parti Bölme):** Purchase Receipt onaylandığında `custom_split_qty` değerine göre veya Stock Entry (Repack/Manufacture) işlemlerinde *Item Customer Detail* tablosundaki `musteri_paketleme_miktari` değerine göre alt partileri oluşturmak.
+   - **Kalite Kontrol (Quality Inspection):** Ürün Kalite Kontrol'e tabiyse etiket basımını bekletmek ve ancak QI belgesi onaylandıktan sonra etiket sürecini tetiklemek.
+   - **Veri Fallback (Geri Dönüş):** Taslak (Draft) halindeki belgelerde eksik olan parti numaralarını kaynak (Source) satırlardan bularak etiket veri sözlüğünü (dictionary) hazırlamak.
+
+Kısacası; `kta_stock` modülü "Hangi etiketin ne zaman ve nasıl (kaç parçaya bölünerek) basılacağına" karar veren beyindir, `kta_system_utils` ise sadece kendisine verilen emri kağıda döken kas gücüdür.
+
+---
+
 ### Toplu İşlem: Paralel Durum Sorgulama
 
 Liste görünümünde tüm yazıcıların durumu `get_all_printers_status()` API'si ile **paralel** olarak sorgulanır.

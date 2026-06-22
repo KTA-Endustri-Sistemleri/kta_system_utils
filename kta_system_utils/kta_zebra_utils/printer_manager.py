@@ -308,7 +308,21 @@ class ZebraPrinterManager:
             # 1 saatlik cache
             frappe.cache().set_value(cache_key, template, expires_in_sec=3600)
 
-        return template.format(data=data)
+        class CleanDataWrapper:
+            def __init__(self, obj):
+                self._obj = obj
+            def __getattr__(self, name):
+                val = None
+                try:
+                    val = getattr(self._obj, name)
+                except AttributeError:
+                    if hasattr(self._obj, "get"):
+                        val = self._obj.get(name)
+                if val is None:
+                    return ""
+                return val
+
+        return template.format(data=CleanDataWrapper(data))
 
     @staticmethod
     def create_print_log(label_doctype, label_name, printer, status, zpl, error=None, user=None):

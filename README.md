@@ -470,6 +470,92 @@ Otomatik testler (`frappe.flags.in_test`) sırasında da mock mod otomatik olara
 
 ---
 
+## System Notification System
+
+`kta_system_utils_notification` modülü; ERPNext içerisinde kullanıcılara, rollere veya departmanlara özel hedeflenmiş duyuru ve bildirimlerin merkezi olarak yönetilmesini sağlayan bir altyapıdır. Asenkron çalışma prensibi (Redis Queue) ve oturum başlatma (Boot Session) entegrasyonu ile sistemi yormadan çalışır.
+
+### Mimari Genel Bakış
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│                     ERPNext / Frappe                         │
+│                                                              │
+│  ┌─────────────────┐     ┌──────────────────────────────┐   │
+│  │  KTA System      │     │  kta_system_notification_    │   │
+│  │  Notification    │     │  popup.js (Client Script)    │   │
+│  │  (DocType)       │     └──────────────▲───────────────┘   │
+│  └────────┬─────────┘                    │ bootinfo (JSON)   │
+│           │ submit                       │                   │
+│           ▼                              │                   │
+│  ┌───────────────────────────────────────┴─────────────┐    │
+│  │               Redis Background Worker               │    │
+│  │  send_notifications_in_background()                 │    │
+│  │  - Hedef Kitle (Role/Dept/User) Çözümleme           │    │
+│  │  - Action Link Enjeksiyonu                          │    │
+│  │  - Notification Log Oluşturma                       │    │
+│  └────────────────────────┬────────────────────────────┘    │
+│                           │                                  │
+│           ┌───────────────▼────────────────┐                │
+│           │            boot.py             │                │
+│           │  - boot_session() hook         │                │
+│           │  - Geçerli bildirimleri filtrele│                │
+│           └────────────────────────────────┘                │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### DocType'lar (Veri Modeli)
+
+#### 1. `KTA System Notification` — Ana Bildirim Formu
+
+Sistem yöneticilerinin yeni bildirim oluşturduğu ana DocType'tır. `is_submittable: true` olarak yapılandırılmıştır; bildirimler yalnızca "Submit" edildiğinde işleme alınır.
+
+| Alan            | Tip      | Açıklama                                      |
+|-----------------|----------|-----------------------------------------------|
+| `subject`       | Data     | Bildirim Başlığı                              |
+| `message`       | Text Editor| Zengin metin destekli mesaj içeriği           |
+| `type`          | Select   | Info, Success, Warning, Error (Renk kodlaması)|
+| `audience_type` | Select   | All System Users, Specific Roles, Specific Departments, Specific Users |
+| `action_label`  | Data     | (Opsiyonel) Yönlendirme butonu etiketi        |
+| `action_link`   | Data     | (Opsiyonel) Yönlendirme butonu URL'si         |
+| `show_on_login` | Check    | İşaretlenirse kullanıcı her giriş yaptığında gösterilir |
+| `from_date` / `to_date` | Date | `show_on_login` için geçerlilik tarih aralığı |
+
+#### 2. Hedefleme Tabloları (Child DocTypes)
+- `KTA Notification Target Role`: Role göre hedefleme.
+- `KTA Notification Target Dept`: Departmana göre hedefleme (ERPNext `Employee` kayıtları üzerinden departman - kullanıcı eşleştirmesi yapılır).
+- `KTA Notification Target User`: Spesifik kullanıcılara göre hedefleme.
+
+---
+
+### Sistem Akışları
+
+#### A. Arkaplan Gönderim Akışı (Background Processing)
+
+Kullanıcı arayüzünü (UI) bloklamamak adına, bildirimler "Submit" edildiğinde doğrudan işlenmez; `frappe.enqueue` aracılığıyla Redis işçi kuyruğuna (Worker Queue) gönderilir.
+
+1. **Hedef Kitle Çözümleme:** Sistem seçilen hedefleme tipine göre (`All System Users`, `Specific Roles`, `Specific Departments`, `Specific Users`) sistemdeki tüm aktif kullanıcıları tarar ve bir havuz oluşturur. (Yalnızca `enabled: 1` ve `user_type: "System User"` olanlar).
+2. **Mesaj Hazırlama:** Eğer `action_link` tanımlanmışsa, mesajın sonuna HTML formatında tıklanabilir bir Call-to-Action butonu enjekte edilir.
+3. **Dağıtım:** Hedeflenen her bir kullanıcı için Frappe'nin yerleşik `Notification Log` tablosuna kayıt atılır. Bu sayede kullanıcılar standart "Çan" (Bell) ikonunda bu bildirimleri görebilir.
+
+#### B. Oturum Başlatma (Boot Session) Enjeksiyonu
+
+Belirli bir tarih aralığı boyunca kullanıcıya her girişinde zorunlu olarak gösterilmesi istenen bildirimler için `show_on_login` özelliği kullanılır.
+
+1. `kta_system_utils/hooks.py` içerisindeki `extend_boot_session` listesi üzerinden `boot.py` tetiklenir.
+2. Oturum açan kullanıcının rolleri kontrol edilir ve aktif tarih aralığındaki (`from_date` - `to_date`) onaylanmış bildirimler sorgulanır.
+3. Kullanıcının görmeye yetkili olduğu bildirimler JSON formatında Frappe `bootinfo` nesnesine eklenir.
+
+#### C. Popup Gösterimi (Frontend)
+
+`kta_system_notification_popup.js` istemci betiği, sayfa yüklendiğinde `frappe.boot.kta_system_notifications` objesini okur.
+Birden fazla bildirim olması durumunda, UI'ın üst üste binmesini engellemek amacıyla bildirimler 2'şer saniyelik gecikmelerle (staggered delay) ekranda `frappe.msgprint` alertleri olarak gösterilir.
+
+#### D. Temizlik (Cleanup) Akışı
+
+Eğer yayınlanmış bir bildirim iptal (Cancel) edilirse, `on_cancel` olay dinleyicisi tetiklenir. Sistem, bu bildirime ait oluşturulmuş tüm `Notification Log` kayıtlarını veritabanından siler ve kullanıcıların okunmamış bildirim (çan) sayaçları otomatik olarak temizlenir.
+
+---
+
 ## License
 
 MIT

@@ -27,7 +27,8 @@ required_apps = ["frappe","erpnext"]
 # include js, css files in header of desk.html
 # app_include_css = "/assets/kta_system_utils/css/kta_system_utils.css"
 app_include_js = [
-    "assets/kta_system_utils/js/cache_reload_handler.js",
+    "/assets/kta_system_utils/js/cache_reload_handler.js",
+    "/assets/kta_system_utils/js/kta_system_notification_popup.js",
 ]
 
 # include js, css files in header of web template
@@ -158,9 +159,10 @@ scheduler_events = {
 }
 
 # Boot session: kullanıcı girişinde hard-reload flag'ini bootinfo'ya ekle
-extend_boot_session = (
-    "kta_system_utils.kta_system_utils_maintenance.boot.boot_session"
-)
+extend_bootinfo = [
+    "kta_system_utils.kta_system_utils_maintenance.boot.boot_session",
+    "kta_system_utils.kta_system_utils_notification.boot.boot_session"
+]
 
 # Testing
 # -------

@@ -1,4 +1,4 @@
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 # Maintenance mode bypass: Administrator ve System Manager kullanıcılarının
 # maintenance mode sırasında sisteme erişimine izin verir.

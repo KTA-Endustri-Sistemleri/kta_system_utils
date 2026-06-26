@@ -11,5 +11,7 @@
   "bugs": {
     "url": "https://github.com/KTA-Endustri-Sistemleri/kta_system_utils/issues"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "conventional-changelog-conventionalcommits": "^9.3.1"
+  }
 }

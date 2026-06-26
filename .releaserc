@@ -1,13 +1,32 @@
 {
 	"branches": ["version-15"],
 	"plugins": [
-		"@semantic-release/commit-analyzer", {
-			"preset": "angular",
-			"releaseRules": [
-				{"breaking": true, "release": false}
-			]
-		},
-		"@semantic-release/release-notes-generator",
+		[
+			"@semantic-release/commit-analyzer", {
+				"preset": "angular",
+				"releaseRules": [
+					{"breaking": true, "release": false}
+				]
+			}
+		],
+		[
+			"@semantic-release/release-notes-generator", {
+				"preset": "conventionalcommits",
+				"presetConfig": {
+					"types": [
+						{"type": "feat", "section": "🚀 Yeni Özellikler (Features)", "hidden": false},
+						{"type": "fix", "section": "🐛 Hata Düzeltmeleri (Bug Fixes)", "hidden": false},
+						{"type": "perf", "section": "⚡ Performans İyileştirmeleri (Performance)", "hidden": false},
+						{"type": "refactor", "section": "🛠️ Refaktör ve Kod Düzenleme (Refactoring)", "hidden": false},
+						{"type": "docs", "section": "📝 Dokümantasyon", "hidden": true},
+						{"type": "chore", "section": "🧹 Diğer", "hidden": true},
+						{"type": "style", "section": "🎨 Stil Düzenlemeleri", "hidden": true},
+						{"type": "test", "section": "🧪 Testler", "hidden": true},
+						{"type": "ci", "section": "⚙️ CI/CD", "hidden": true}
+					]
+				}
+			}
+		],
 		[
 			"@semantic-release/exec", {
 				"prepareCmd": "sed -ir \"s/[0-9]*\\.[0-9]*\\.[0-9]*/${nextRelease.version}/\" kta_system_utils/__init__.py"

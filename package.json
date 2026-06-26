@@ -1,0 +1,15 @@
+{
+  "name": "kta_system_utils",
+  "description": "KTA system maintenance and utility tools",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KTA-Endustri-Sistemleri/kta_system_utils.git"
+  },
+  "homepage": "https://github.com/KTA-Endustri-Sistemleri/kta_system_utils",
+  "author": "KTA Endustri Sistemleri San. ve Tic. Ltd. Sti.",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/KTA-Endustri-Sistemleri/kta_system_utils/issues"
+  },
+  "devDependencies": {}
+}

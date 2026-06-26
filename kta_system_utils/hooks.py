@@ -33,7 +33,7 @@ app_include_js = [
 
 # include js, css files in header of web template
 # web_include_css = "/assets/kta_system_utils/css/kta_system_utils.css"
-# web_include_js = "/assets/kta_system_utils/js/kta_system_utils.js"
+web_include_js = "/assets/kta_system_utils/js/kta_login_cleanup.js"
 
 # include custom scss in every website theme (without file extension ".scss")
 # website_theme_scss = "kta_system_utils/public/scss/website"
@@ -84,7 +84,7 @@ doctype_list_js = {"KTA Zebra Printers" : "public/js/kta_zebra_indicator.js"}
 # ------------
 
 # before_install = "kta_system_utils.install.before_install"
-# after_install = "kta_system_utils.install.after_install"
+after_install = "kta_system_utils.install.after_install"
 
 # Uninstallation
 # ------------
@@ -240,3 +240,5 @@ extend_bootinfo = [
 # 	"Logging DocType Name": 30  # days to retain logs
 # }
 
+# on_session_creation hook to prevent unauthorized users from successfully logging in during maintenance mode
+on_session_creation = "kta_system_utils.kta_system_utils_maintenance.maintenance_bypass.prevent_login_if_maintenance"

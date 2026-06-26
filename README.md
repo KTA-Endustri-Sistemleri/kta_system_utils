@@ -556,6 +556,262 @@ Eğer yayınlanmış bir bildirim iptal (Cancel) edilirse, `on_cancel` olay dinl
 
 ---
 
+## System Maintenance
+
+`kta_system_utils_maintenance` modülü; gece bakım görevleri (cache temizleme, oturum sonlandırma) ve maintenance mode sırasında yetkili kullanıcılara erişim izni sağlayan altyapıyı içerir.
+
+### Mimari Genel Bakış
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│                     ERPNext / Frappe                         │
+│                                                              │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │         __init__.py (app import sırasında)          │    │
+│  │    apply_patch() → frappe.app.init_request wrap     │    │
+│  └────────────────────────┬────────────────────────────┘    │
+│                           │                                  │
+│  ┌────────────────────────▼────────────────────────────┐    │
+│  │         maintenance_bypass.py (Monkey-Patch)        │    │
+│  │  - SessionStopped yakalama                          │    │
+│  │  - Session kurulumu sonrası rol kontrolü            │    │
+│  │  - Admin/System Manager bypass izni                 │    │
+│  └────────────────────────┬────────────────────────────┘    │
+│                           │                                  │
+│  ┌────────────────────────▼────────────────────────────┐    │
+│  │                   tasks.py (Scheduler)              │    │
+│  │  nightly_cache_clear() — Her gece 01:00             │    │
+│  │  - Force logout all users                           │    │
+│  │  - Redis cache temizleme                            │    │
+│  │  - __pycache__ / .pyc silme                         │    │
+│  │  - Hard-reload flag (Redis, 4 saat TTL)             │    │
+│  └────────────────────────┬────────────────────────────┘    │
+│                           │                                  │
+│  ┌────────────────────────▼────────────────────────────┐    │
+│  │                   boot.py (Boot Session)            │    │
+│  │  - Hard-reload sinyalini bootinfo'ya ekle           │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │         cache_reload_handler.js (Frontend)          │    │
+│  │  - bootinfo'daki flag'i oku                         │    │
+│  │  - Gerekiyorsa tarayıcıyı hard-reload et           │    │
+│  └─────────────────────────────────────────────────────┘    │
+└──────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 1. Gece Bakım Görevi (Nightly Cache Clear)
+
+Her gece 01:00'de scheduler tarafından `nightly_cache_clear()` fonksiyonu çalıştırılır ve aşağıdaki işlemleri sırasıyla yapar:
+
+| Adım | İşlem | Açıklama |
+|------|-------|----------|
+| 1 | `_force_logout_all()` | Tüm aktif kullanıcı oturumlarını sonlandırır |
+| 2 | `_clear_redis_cache()` | Frappe Redis önbelleğini temizler |
+| 3 | `_clear_pycache()` | `apps/` altındaki `__pycache__` ve `.pyc` dosyalarını siler |
+| 4 | `_set_hard_reload_flag()` | Redis'e hard-reload sinyali yazar (4 saat TTL) |
+
+**Hard-Reload Akışı:**
+
+```
+Gece 01:00 → nightly_cache_clear()
+      │
+      ├─► Redis'e flag yaz: kta_system_utils_hard_reload_required = 1 (TTL: 4 saat)
+      │
+      ▼
+Sabah kullanıcı giriş yapar
+      │
+      ├─► boot.py → bootinfo'ya flag eklenir
+      │
+      ├─► cache_reload_handler.js → flag'i okur
+      │       └─► Flag = 1 → location.reload(true) ile hard-reload
+      │
+      └─► Kullanıcı güncel asset'lerle çalışmaya başlar
+```
+
+---
+
+### 2. Maintenance Mode Bypass (Yetkili Kullanıcı Erişimi)
+
+#### Problem
+
+Frappe'de `maintenance_mode=1` olduğunda `init_request()` fonksiyonunda `SessionStopped` exception'ı fırlatılır. Bu kontrol, kullanıcı session'ı kurulmadan **önce** yapıldığı için kullanıcının kim olduğu bilinmez ve **tüm kullanıcılar** engellenir — Administrator dahil.
+
+Bunun yanı sıra, Frappe varsayılanında bakım modu açıldığında eski oturumlar aktif kalır.
+
+#### Çözüm: Anında Logout & Monkey-Patch
+
+`kta_system_utils` modülü import edildiğinde (her worker başlatıldığında) `frappe.app.init_request` fonksiyonu monkey-patch ile wrap edilir.
+
+**Otomatik Temizlik (Forced Logout & Cache Clear):** Modun açıldığı (0'dan 1'e geçtiği) an tespit edilerek `_force_logout_all()` tetiklenir. Administrator dahil sistemdeki tüm kullanıcıların oturumları silinir ve kullanıcılar anında `/login` sayfasına yönlendirilir.
+
+**Tarayıcı Temizliği (Frontend):** Kullanıcılar login sayfasına düştüklerinde `kta_login_cleanup.js` scripti çalışır ve Frappe'nin tarayıcıda tuttuğu `localStorage` ve `sessionStorage` kalıntılarını sıfırlar.
+
+```
+Request → patched init_request → SessionStopped yakalanır
+→ Session kurulur → Rol kontrolü
+    ├─► Admin veya System Manager ise → ✅ Erişim verilir
+    └─► Değilse → ❌ SessionStopped yeniden fırlatılır
+```
+
+#### Detaylı Akış
+
+```
+Request gelir
+      │
+      ▼
+_patched_init_request(request)
+      │
+      ├─► Orijinal init_request() çalıştırılır
+      │       ├─► maintenance_mode kapalı → Normal akış, patch devreye girmez
+      │       └─► maintenance_mode açık → SessionStopped fırlatılır
+      │
+      ▼
+SessionStopped yakalanır (except bloğu)
+      │
+      ├─► _complete_init_after_maintenance_bypass(request)
+      │       ├─► max_content_length ayarla
+      │       ├─► make_form_dict(request)
+      │       ├─► HTTPRequest() → Session + Cookie + Auth kurulur
+      │       └─► before_request hooks çalıştırılır
+      │
+      ▼
+_is_maintenance_bypass_allowed()
+      │
+      ├─► frappe.session.user == "Administrator" → ✅ Her zaman bypass
+      │
+      ├─► site_config.maintenance_bypass_roles kontrol edilir
+      │       (varsayılan: ["System Manager"])
+      │       └─► Kullanıcının rolleri ile kesişim var mı?
+      │               ├─► EVET → ✅ Bypass izni verilir
+      │               └─► HAYIR → ❌ SessionStopped yeniden fırlatılır
+      │
+      ▼
+Erişim modu belirlenir:
+      ├─► maintenance_bypass_full_access = true → Full access (yazma dahil)
+      └─► maintenance_bypass_full_access = false → Read-only mode (varsayılan)
+```
+
+#### Bypass Kuralları
+
+| Kullanıcı | Bypass İzni | Açıklama |
+|-----------|-------------|----------|
+| `Administrator` | ✅ Her zaman | Sabit kodlu, konfigürasyona bağlı değil |
+| System Manager rolü | ✅ Varsayılan | `maintenance_bypass_roles` ile konfigüre edilebilir |
+| Diğer roller | ❌ Engellenir | `maintenance_bypass_roles`'a eklenmediği sürece |
+| Guest | ❌ Her zaman | Session kurulsa bile bypass yapılamaz |
+
+---
+
+### Konfigürasyon
+
+#### Otomatik Kurulum
+
+App yüklendiğinde (`bench install-app kta_system_utils`) `after_install` hook'u çalışır ve aşağıdaki ayarlar `site_config.json`'a **otomatik eklenir**. Mevcut değerler varsa üzerine yazılmaz.
+
+#### site_config.json Ayarları
+
+```json
+{
+  "maintenance_bypass_roles": ["System Manager"],
+  "maintenance_bypass_full_access": false
+}
+```
+
+| Ayar | Tip | Varsayılan | Açıklama |
+|------|-----|------------|----------|
+| `maintenance_bypass_roles` | list veya string | `["System Manager"]` | Maintenance mode'da bypass izni olan Frappe rolleri |
+| `maintenance_bypass_full_access` | boolean | `false` | `true` ise bypass eden kullanıcılar yazma dahil tam erişime sahip olur. `false` ise read-only mode'da çalışır |
+
+**Örnekler:**
+
+```json
+// Sadece System Manager (varsayılan):
+{
+  "maintenance_bypass_roles": ["System Manager"]
+}
+
+// Birden fazla rol:
+{
+  "maintenance_bypass_roles": ["System Manager", "IT Support"]
+}
+
+// String olarak tek rol:
+{
+  "maintenance_bypass_roles": "System Manager"
+}
+
+// Full access (yazma dahil):
+{
+  "maintenance_bypass_roles": ["System Manager"],
+  "maintenance_bypass_full_access": true
+}
+```
+
+---
+
+### Loglama
+
+Maintenance mode bypass işlemleri Python logger üzerinden loglanır (`kta_system_utils` logger):
+
+| Durum | Log Seviyesi | Mesaj Formatı |
+|-------|-------------|---------------|
+| Bypass — Read-Only | INFO | `Maintenance bypass: READ-ONLY — user=X, ip=Y` |
+| Bypass — Full Access | INFO | `Maintenance bypass: FULL ACCESS — user=X, ip=Y` |
+| Erişim Reddedildi | INFO | `Maintenance mode: erişim reddedildi — user=X, ip=Y` |
+| Patch Uygulandı | INFO | `kta_system_utils: maintenance_bypass patch uygulandı` |
+
+---
+
+### Dosya Yapısı
+
+```
+kta_system_utils/
+├── __init__.py                              # Patch import ve uygulama
+├── install.py                               # after_install: site_config ayarları
+├── hooks.py                                 # Scheduler, boot, install hooks
+└── kta_system_utils_maintenance/
+    ├── __init__.py
+    ├── boot.py                              # Hard-reload flag → bootinfo
+    ├── maintenance_bypass.py                # Monkey-patch: init_request wrap
+    ├── tasks.py                             # Gece bakım görevleri
+    └── tests/
+        ├── test_maintenance.py              # Gece bakım testleri
+        └── test_maintenance_bypass.py       # Bypass mekanizması testleri
+```
+
+---
+
+### Manuel Test
+
+```bash
+# Maintenance mode aç
+bench --site [site_name] set-maintenance-mode on
+
+# Test:
+# 1. Normal kullanıcı ile giriş → "Session Stopped" sayfası görmeli
+# 2. Administrator ile giriş → Sisteme erişebilmeli
+# 3. System Manager rolündeki kullanıcı ile giriş → Sisteme erişebilmeli
+
+# Maintenance mode kapat
+bench --site [site_name] set-maintenance-mode off
+# Tüm kullanıcılar normal erişebilmeli
+```
+
+---
+
+### Bilinen Sınırlamalar
+
+| Sınırlama | Açıklama |
+|-----------|----------|
+| Monkey-patch yaklaşımı | Frappe core'u güncellenmesi durumunda `init_request` imzası değişirse patch uyumluluğu kontrol edilmelidir |
+| Bypass kullanıcıları varsayılanda read-only | `maintenance_bypass_full_access` açılmadıkça bypass eden kullanıcılar DB'ye yazma yapamaz |
+| Session kurulum maliyeti | Bypass kontrolü için her request'te session kurulumu yapılır; bu maintenance mode'daki performansı çok az etkileyebilir |
+
+---
+
 ## License
 
 MIT

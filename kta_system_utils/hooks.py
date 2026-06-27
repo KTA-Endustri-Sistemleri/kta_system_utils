@@ -194,7 +194,7 @@ extend_bootinfo = [
 
 # Request Events
 # ----------------
-# before_request = ["kta_system_utils.utils.before_request"]
+before_request = ["kta_system_utils.kta_system_utils_maintenance.maintenance_hook.before_request"]
 # after_request = ["kta_system_utils.utils.after_request"]
 
 # Job Events
@@ -241,4 +241,4 @@ extend_bootinfo = [
 # }
 
 # on_session_creation hook to prevent unauthorized users from successfully logging in during maintenance mode
-on_session_creation = "kta_system_utils.kta_system_utils_maintenance.maintenance_bypass.prevent_login_if_maintenance"
+on_login = "kta_system_utils.kta_system_utils_maintenance.maintenance_bypass.prevent_login_if_maintenance"

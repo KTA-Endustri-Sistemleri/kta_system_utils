@@ -23,19 +23,20 @@ kta_system_utils.maintenance.check_hard_reload = function () {
     }
 
     /**
-     * sessionStorage kullanımı: localStorage'dan farklı olarak
-     * tab/pencere kapatıldığında sıfırlanır.
-     * Bu sayesinde:
-     *   - Aynı oturumda (tab açık) sonsuz döngü olmaz
-     *   - Yeni sekme / yeni oturumda tekrar tetiklenir (kasıtlı)
+     * localStorage kullanımı: sessionStorage'dan farklı olarak
+     * tab/pencere veya tarayıcı kapatıldığında SIFIRLANMAZ.
+     * Bu sayede, aynı gün içinde defalarca giriş çıkış yapılsa da
+     * hard-reload sadece günde BİR KERE çalışır (sürekli yenileme sorununu çözer).
      */
-    var RELOAD_KEY = "kta_system_utils_reload_done";
-    if (sessionStorage.getItem(RELOAD_KEY)) {
+    var RELOAD_KEY = "kta_system_utils_reload_date";
+    var today = frappe.datetime.get_today();
+
+    if (localStorage.getItem(RELOAD_KEY) === today) {
         return;
     }
 
     // Önce işareti koy, sonra reload — çökme/hata durumunda döngüye girme
-    sessionStorage.setItem(RELOAD_KEY, "1");
+    localStorage.setItem(RELOAD_KEY, today);
 
     frappe.show_alert({
         message: __("Sistem önbelleği güncellendi. Sayfa yeniden yükleniyor..."),

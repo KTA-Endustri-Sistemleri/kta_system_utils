@@ -13,7 +13,7 @@ import frappe
 
 _LOGGER = "kta_system_utils"
 _RELOAD_FLAG_KEY = "kta_system_utils_hard_reload_required"
-_RELOAD_FLAG_TTL = 4 * 3600  # 4 saat (01:00 → 05:00)
+_RELOAD_FLAG_TTL = 24 * 3600  # 24 saat (Tüm gün giriş yapanları kapsar)
 
 
 def nightly_cache_clear():

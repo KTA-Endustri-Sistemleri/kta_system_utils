@@ -1,3 +1,9 @@
+## [1.2.2](https://github.com/KTA-Endustri-Sistemleri/kta_system_utils/compare/v1.2.1...v1.2.2) (2026-10-27)
+
+### 🐛 Hata Düzeltmeleri (Bug Fixes)
+
+* **deploy:** authenticate git operations with GITHUB_TOKEN ([aab4cd9](https://github.com/KTA-Endustri-Sistemleri/kta_system_utils/commit/aab4cd95cba27fbac24281baab51128c515928ec))
+
 ## [1.2.1](https://github.com/KTA-Endustri-Sistemleri/kta_system_utils/compare/v1.2.0...v1.2.1) (2026-10-27)
 
 ### ⚡ Performans İyileştirmeleri (Performance)

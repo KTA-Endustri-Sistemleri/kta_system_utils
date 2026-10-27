@@ -60,8 +60,8 @@ frappe.listview_settings['KTA Zebra Printers'] = {
                         });
                     }
                     
-                    // İstek tamamen bittikten SONRA 5 saniye bekle ve tekrarla
-                    printer_status_timer = setTimeout(fetch_and_update, 5000);
+                    // İstek tamamen bittikten SONRA 30 saniye bekle ve tekrarla (DoS riskini önlemek için)
+                    printer_status_timer = setTimeout(fetch_and_update, 30000);
                 }
             });
         };

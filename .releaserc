@@ -40,7 +40,7 @@
 		[
 			"@semantic-release/git", {
 				"assets": ["kta_system_utils/__init__.py", "CHANGELOG.md"],
-				"message": "chore(release): Bumped to Version ${nextRelease.version}\n\n${nextRelease.notes}"
+				"message": "chore(release): Bumped to Version ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
 			}
 		],
 		"@semantic-release/github"

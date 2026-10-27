@@ -29,7 +29,8 @@ jobs:
         id: check_version
         run: |
           cd /home/erpnext/frappe-bench/apps/kta_system_utils
-          git fetch --tags origin
+          AUTH_B64=$(echo -n "x-access-token:${{ secrets.GITHUB_TOKEN }}" | base64 -w 0)
+          git -c "http.extraheader=AUTHORIZATION: basic ${AUTH_B64}" fetch --tags origin
 
           INPUT_TAG="${{ github.event.inputs.tag }}"
           FORCE="${{ github.event.inputs.force }}"
@@ -60,10 +61,11 @@ jobs:
         if: steps.check_version.outputs.should_deploy == 'true'
         run: |
           cd /home/erpnext/frappe-bench/apps/kta_system_utils
+          AUTH_B64=$(echo -n "x-access-token:${{ secrets.GITHUB_TOKEN }}" | base64 -w 0)
           TARGET="${{ steps.check_version.outputs.target_ref }}"
           echo "Checking out $TARGET..."
           git checkout "$TARGET"
-          git pull origin "$TARGET" || true
+          git -c "http.extraheader=AUTHORIZATION: basic ${AUTH_B64}" pull origin "$TARGET" || true
 
       - name: Install Python Dependencies
         if: steps.check_version.outputs.should_deploy == 'true'

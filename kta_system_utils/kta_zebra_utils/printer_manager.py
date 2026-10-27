@@ -20,14 +20,7 @@ class ZebraPrinter:
             return False
 
     def get_detailed_status(self):
-        """ZPL ~HS komutu ile yazıcıdan detaylı durum bilgisi çeker."""
-        if not self.check_connection():
-            return {
-                "status": "Offline",
-                "color": "red",
-                "message": "Erişilemiyor (Offline)"
-            }
-
+        """ZPL ~HS komutu ile yazıcıdan detaylı durum bilgisi çeker. (Soket optimizasyonu)"""
         try:
             # ~HS (Host Status) komutunu gönder
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -39,6 +32,12 @@ class ZebraPrinter:
                 data = s.recv(1024).decode('ascii', errors='ignore')
                 
                 return self._parse_hs_response(data)
+        except (socket.timeout, ConnectionRefusedError, OSError):
+            return {
+                "status": "Offline",
+                "color": "red",
+                "message": "Erişilemiyor (Offline)"
+            }
         except Exception as e:
             return {
                 "status": "Error",

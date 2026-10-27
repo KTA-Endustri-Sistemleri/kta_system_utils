@@ -1,0 +1,109 @@
+name: Deploy Production Release
+
+on:
+  schedule:
+    # Her Pazar gecesi TSİ 23:15'te çalışır (UTC 20:15)
+    - cron: '15 20 * * 0'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag or branch to deploy (leave empty for latest release)'
+        required: false
+        default: ''
+      force:
+        description: 'Force deploy even if already on the target tag'
+        type: boolean
+        default: false
+
+concurrency:
+  group: production-deployment-system-utils
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Bench
+    runs-on: [self-hosted, production, system-utils]
+
+    steps:
+      - name: Check for New Release
+        id: check_version
+        run: |
+          cd /home/erpnext/frappe-bench/apps/kta_system_utils
+          git fetch --tags origin
+
+          INPUT_TAG="${{ github.event.inputs.tag }}"
+          FORCE="${{ github.event.inputs.force }}"
+
+          if [ -n "$INPUT_TAG" ]; then
+            TARGET_REF="$INPUT_TAG"
+          else
+            TARGET_REF=$(git tag -l "v*" --sort=-v:refname | head -n 1)
+            if [ -z "$TARGET_REF" ]; then
+              TARGET_REF="version-15"
+            fi
+          fi
+
+          CURRENT_REF=$(git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD)
+
+          echo "Current version on bench : $CURRENT_REF"
+          echo "Target version to deploy : $TARGET_REF"
+
+          if [ "$CURRENT_REF" = "$TARGET_REF" ] && [ "$FORCE" != "true" ]; then
+            echo "should_deploy=false" >> $GITHUB_OUTPUT
+            echo "Bench is already up-to-date with $TARGET_REF. Skipping deployment."
+          else
+            echo "should_deploy=true" >> $GITHUB_OUTPUT
+            echo "target_ref=$TARGET_REF" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update kta_system_utils to Target
+        if: steps.check_version.outputs.should_deploy == 'true'
+        run: |
+          cd /home/erpnext/frappe-bench/apps/kta_system_utils
+          TARGET="${{ steps.check_version.outputs.target_ref }}"
+          echo "Checking out $TARGET..."
+          git checkout "$TARGET"
+          git pull origin "$TARGET" || true
+
+      - name: Install Python Dependencies
+        if: steps.check_version.outputs.should_deploy == 'true'
+        run: |
+          /home/erpnext/frappe-bench/env/bin/pip install -q -e /home/erpnext/frappe-bench/apps/kta_system_utils
+
+      - name: Enable Maintenance Mode
+        id: maintenance
+        if: steps.check_version.outputs.should_deploy == 'true'
+        run: |
+          cd /home/erpnext/frappe-bench
+          bench --site erpnext.kta-endustri.com.tr set-maintenance-mode on
+
+      - name: Run Bench Migrate
+        if: steps.check_version.outputs.should_deploy == 'true'
+        run: |
+          cd /home/erpnext/frappe-bench
+          bench --site erpnext.kta-endustri.com.tr migrate
+
+      - name: Build Frontend Assets
+        if: steps.check_version.outputs.should_deploy == 'true'
+        run: |
+          cd /home/erpnext/frappe-bench
+          bench build --app kta_system_utils --production
+
+      - name: Clear Caches
+        if: steps.check_version.outputs.should_deploy == 'true'
+        run: |
+          cd /home/erpnext/frappe-bench
+          bench --site erpnext.kta-endustri.com.tr clear-cache
+          bench --site erpnext.kta-endustri.com.tr clear-website-cache
+
+      - name: Restart Bench Services
+        if: steps.check_version.outputs.should_deploy == 'true'
+        run: |
+          cd /home/erpnext/frappe-bench
+          bench restart
+
+      - name: Disable Maintenance Mode
+        if: always() && steps.maintenance.conclusion == 'success'
+        run: |
+          cd /home/erpnext/frappe-bench
+          bench --site erpnext.kta-endustri.com.tr set-maintenance-mode off

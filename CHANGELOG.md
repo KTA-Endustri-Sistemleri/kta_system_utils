@@ -1,3 +1,9 @@
+## [1.3.0](https://github.com/KTA-Endustri-Sistemleri/kta_system_utils/compare/v1.2.2...v1.3.0) (2026-10-27)
+
+### 🚀 Yeni Özellikler (Features)
+
+* **logging:** add configurable module logger with site_config toggle ([42f8cee](https://github.com/KTA-Endustri-Sistemleri/kta_system_utils/commit/42f8ceeb3070aadf844d113cef52affac6424259))
+
 ## [1.2.2](https://github.com/KTA-Endustri-Sistemleri/kta_system_utils/compare/v1.2.1...v1.2.2) (2026-10-27)
 
 ### 🐛 Hata Düzeltmeleri (Bug Fixes)

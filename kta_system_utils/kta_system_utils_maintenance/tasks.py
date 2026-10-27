@@ -10,8 +10,8 @@ from __future__ import unicode_literals
 import os
 import subprocess
 import frappe
+from kta_system_utils.logger import get_logger
 
-_LOGGER = "kta_system_utils"
 _RELOAD_FLAG_KEY = "kta_system_utils_hard_reload_required"
 _RELOAD_FLAG_TTL = 24 * 3600  # 24 saat (Tüm gün giriş yapanları kapsar)
 
@@ -26,14 +26,14 @@ def nightly_cache_clear():
     3. apps/ altındaki __pycache__ ve .pyc dosyalarını siler
     4. Kullanıcılar sabah giriş yapınca tarayıcıyı hard-reload'a zorlar
     """
-    frappe.logger(_LOGGER).info("nightly_cache_clear: Başlatıldı")
+    get_logger().info("nightly_cache_clear: Başlatıldı")
 
     _force_logout_all()
     _clear_redis_cache()
     _clear_pycache()
     _set_hard_reload_flag()
 
-    frappe.logger(_LOGGER).info("nightly_cache_clear: Tamamlandı")
+    get_logger().info("nightly_cache_clear: Tamamlandı")
 
 
 # ---------------------------------------------------------------------------
@@ -48,7 +48,7 @@ def _force_logout_all():
         frappe.set_user("Administrator")
         clear_all_sessions(reason="KTA gece bakım: önbellek temizleme")
         frappe.db.commit()
-        frappe.logger(_LOGGER).info("nightly_cache_clear: → Tüm oturumlar kapatıldı")
+        get_logger().info("nightly_cache_clear: → Tüm oturumlar kapatıldı")
     except Exception:
         frappe.log_error(
             title="kta_system_utils_maintenance: force_logout hatası",
@@ -60,7 +60,7 @@ def _clear_redis_cache():
     """Frappe Redis önbelleğini temizler."""
     try:
         frappe.clear_cache()
-        frappe.logger(_LOGGER).info("nightly_cache_clear: → Redis cache temizlendi")
+        get_logger().info("nightly_cache_clear: → Redis cache temizlendi")
     except Exception:
         frappe.log_error(
             title="kta_system_utils_maintenance: redis_clear hatası",
@@ -80,7 +80,7 @@ def _clear_pycache():
         apps_path = os.path.join(bench_path, "apps")
 
         if not os.path.isdir(apps_path):
-            frappe.logger(_LOGGER).warning(
+            get_logger().warning(
                 f"nightly_cache_clear: apps_path bulunamadı → {apps_path}"
             )
             return
@@ -101,7 +101,7 @@ def _clear_pycache():
             capture_output=True, text=True, timeout=120, check=False,
         )
 
-        frappe.logger(_LOGGER).info(
+        get_logger().info(
             "nightly_cache_clear: → __pycache__ ve .pyc silindi"
         )
     except Exception:
@@ -122,7 +122,7 @@ def _set_hard_reload_flag():
             1,
             expires_in_sec=_RELOAD_FLAG_TTL,
         )
-        frappe.logger(_LOGGER).info(
+        get_logger().info(
             f"nightly_cache_clear: → {_RELOAD_FLAG_KEY} flag set edildi "
             f"({_RELOAD_FLAG_TTL // 3600} saat)"
         )

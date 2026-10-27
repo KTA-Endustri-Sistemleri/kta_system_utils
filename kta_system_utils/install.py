@@ -5,12 +5,14 @@
 
 import frappe
 from frappe.installer import update_site_config
+from kta_system_utils.logger import get_logger
 
 
 # Maintenance bypass varsayılan ayarları
 _MAINTENANCE_BYPASS_DEFAULTS = {
     "maintenance_bypass_roles": ["System Manager"],
     "maintenance_bypass_full_access": False,
+    "kta_system_utils_logging": 1,
 }
 
 
@@ -25,10 +27,10 @@ def after_install():
     for key, default_value in _MAINTENANCE_BYPASS_DEFAULTS.items():
         if frappe.conf.get(key) is None:
             update_site_config(key, default_value)
-            frappe.logger("kta_system_utils").info(
+            get_logger().info(
                 f"after_install: site_config'e '{key}' = {default_value!r} eklendi"
             )
         else:
-            frappe.logger("kta_system_utils").info(
+            get_logger().info(
                 f"after_install: '{key}' zaten mevcut, atlanıyor"
             )

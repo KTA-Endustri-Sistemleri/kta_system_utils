@@ -754,14 +754,41 @@ App yüklendiğinde (`bench install-app kta_system_utils`) `after_install` hook'
 
 ### Loglama
 
-Maintenance mode bypass işlemleri Python logger üzerinden loglanır (`kta_system_utils` logger):
+`kta_system_utils` modülü, maintenance bypass ve gece bakım işlemlerini kendi özel logger'ı üzerinden aşağıdaki konumlara yazar:
+- **Bench geneli:** `logs/kta_system_utils.log`
+- **Siteye özel:** `sites/<site>/logs/kta_system_utils.log`
 
 | Durum | Log Seviyesi | Mesaj Formatı |
 |-------|-------------|---------------|
-| Bypass — Read-Only | INFO | `Maintenance bypass: READ-ONLY — user=X, ip=Y` |
-| Bypass — Full Access | INFO | `Maintenance bypass: FULL ACCESS — user=X, ip=Y` |
-| Erişim Reddedildi | INFO | `Maintenance mode: erişim reddedildi — user=X, ip=Y` |
-| Patch Uygulandı | INFO | `kta_system_utils: maintenance_bypass patch uygulandı` |
+| Bypass — Read-Only | INFO | `Maintenance bypass: READ-ONLY — user=X` |
+| Bypass — Full Access | INFO | `Maintenance bypass: FULL ACCESS — user=X` |
+| Erişim Reddedildi | INFO | `Maintenance mode: erişim reddedildi — user=X` |
+| Maintenance Açılış | INFO | `Maintenance mode AKTİF: Tüm sessionlar temizlendi.` |
+| Maintenance Kapanış | INFO | `Maintenance mode KAPATILDI.` |
+| Gece Bakım | INFO | `nightly_cache_clear: Başlatıldı / Tamamlandı` |
+
+#### Loglamayı Açma / Kapatma (Hızlı Geçiş)
+
+Sistemdeki diğer servisleri etkilemeden, yalnızca `kta_system_utils` loglamasını `site_config.json` üzerinden anında kapatabilir veya açabilirsiniz:
+
+- **Loglamayı tamamen kapatmak (yalnızca ERROR seviyesi):**
+  ```bash
+  bench --site <site> set-config kta_system_utils_logging 0
+  ```
+  *(veya `site_config.json` içinde `"kta_system_utils_logging": 0` veya `false`)*
+
+- **Loglamayı tekrar açmak (varsayılan: INFO seviyesi):**
+  ```bash
+  bench --site <site> set-config kta_system_utils_logging 1
+  ```
+
+- **İsteğe bağlı log seviyesi belirleme (DEBUG, INFO, WARNING, ERROR):**
+  ```bash
+  bench --site <site> set-config kta_system_utils_log_level INFO
+  ```
+
+> [!NOTE]
+> Değişiklikler bench restart gerektirmeden hemen bir sonraki istek veya görevde dinamik olarak devreye girer.
 
 ---
 

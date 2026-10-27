@@ -1,5 +1,7 @@
 import frappe
 from frappe import _
+from kta_system_utils.logger import get_logger
+
 
 def before_request():
     """
@@ -9,7 +11,7 @@ def before_request():
     read_only kilidini kaldırmak için çalışır.
     """
     mode = int(frappe.local.conf.get("maintenance_mode") or 0)
-    
+
     # Session temizleme mantığı (açılış/kapanış tespiti)
     if getattr(frappe, "db", None):
         last_mode = frappe.cache().get_value("kta_maintenance_mode_status")
@@ -19,11 +21,12 @@ def before_request():
             frappe.cache().set_value("kta_maintenance_mode_status", 1)
             frappe.db.sql("delete from `tabSessions`")
             from frappe.sessions import clear_all_sessions
+
             clear_all_sessions()
-            frappe.logger("kta_system_utils").info("Maintenance mode AKTİF: Tüm sessionlar temizlendi.")
+            get_logger().info("Maintenance mode AKTİF: Tüm sessionlar temizlendi.")
         elif mode == 0 and last_mode == 1:
             frappe.cache().set_value("kta_maintenance_mode_status", 0)
-            frappe.logger("kta_system_utils").info("Maintenance mode KAPATILDI.")
+            get_logger().info("Maintenance mode KAPATILDI.")
 
     if mode != 1:
         return
@@ -34,8 +37,14 @@ def before_request():
         path = request.path
         # Login/logout ve asset isteklerine izin ver
         _AUTH_WHITELIST_PATHS = frozenset(("/login", "/api/method/login", "/api/method/logout"))
-        _AUTH_WHITELIST_PREFIXES = ("/api/method/frappe.client.get_list", "/api/method/frappe.client.get_count", "/api/method/frappe.website.", "/api/method/frappe.www.", "/assets/")
-        
+        _AUTH_WHITELIST_PREFIXES = (
+            "/api/method/frappe.client.get_list",
+            "/api/method/frappe.client.get_count",
+            "/api/method/frappe.website.",
+            "/api/method/frappe.www.",
+            "/assets/",
+        )
+
         if path in _AUTH_WHITELIST_PATHS:
             _disable_read_only()
             return
@@ -44,7 +53,8 @@ def before_request():
             _disable_read_only()
             return
         for prefix in _AUTH_WHITELIST_PREFIXES:
-            if path.startswith(prefix): return
+            if path.startswith(prefix):
+                return
 
     user = getattr(frappe.session, "user", None)
     if not user or user == "Guest":
@@ -63,9 +73,14 @@ def before_request():
         # Yetkili kullanıcı
         if frappe.local.conf.get("maintenance_bypass_full_access"):
             _disable_read_only()
+            get_logger().info(f"Maintenance bypass: FULL ACCESS — user={user}")
+        else:
+            get_logger().info(f"Maintenance bypass: READ-ONLY — user={user}")
         return
     else:
+        get_logger().info(f"Maintenance mode: erişim reddedildi — user={user}")
         raise frappe.SessionStopped("Session Stopped")
+
 
 def _disable_read_only():
     frappe.flags.read_only = False
